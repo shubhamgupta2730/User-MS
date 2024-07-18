@@ -2,8 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
 import logger from './logger';
-import userRoutes from './routes/userRoute';
-import { connectRabbitMQ } from './rabbitMQ/producer';
+import userRoutes from './modules/user/routes/userRoute';
 dotenv.config();
 
 const app = express();
@@ -11,9 +10,6 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to database
 connectDB();
-
-connectRabbitMQ();
-// startConsumer();
 
 // Middleware
 app.use(express.json());
