@@ -17,7 +17,7 @@ const UserProfileSchema = new Schema<IUserProfile>(
     },
     firstName: {
       type: String,
-      default: '', 
+      default: '',
     },
     lastName: {
       type: String,
@@ -29,7 +29,7 @@ const UserProfileSchema = new Schema<IUserProfile>(
     },
     dob: {
       type: Date,
-      default: null, 
+      default: null,
     },
     gender: {
       type: String,
