@@ -2,9 +2,9 @@ import express from 'express';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
 import { logger } from './logger';
-import morgan from 'morgan'
+import morgan from 'morgan';
 import requestLogger from './middlewares/requestLogger';
-import userRoutes from './modules/user/routes/userRoute';
+import userRoutes from '../src/routes/userRoutes';
 dotenv.config();
 
 const app = express();
@@ -22,7 +22,6 @@ const skip = () => {
   const env = process.env.NODE_ENV || 'development';
   return env === 'test';
 };
-
 
 // Connect to database
 connectDB();
