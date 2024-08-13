@@ -5,11 +5,13 @@ import productRoutes from '../modules/products/routes/productRoutes';
 import bundleRoutes from '../modules/bundles/routes/bundleRoute';
 import cartRoutes from '../modules/cart/routes/cartRoute';
 import wishlistRoutes from '../modules/wishlist/routes/wishlistRoutes';
+import homepageRoutes from '../modules/homepage/routes/homepageRoute';
 
 router.use('/categoryRoute', categoryRoutes);
 router.use('/productRoute', productRoutes);
 router.use('/bundleRoute', bundleRoutes);
 router.use('/cartRoute', cartRoutes);
 router.use('/wishlistRoute', wishlistRoutes);
+router.use('/homepageRoute', homepageRoutes);
 
 export default router;

@@ -14,7 +14,6 @@ export const getCartItems = async (req: CustomRequest, res: Response) => {
   const userId = req.user?.userId;
 
   try {
-    // Fetch the cart with populated productId and bundleId references
     const cart = await Cart.findOne({ userId })
       .populate({
         path: 'items',
@@ -22,22 +21,21 @@ export const getCartItems = async (req: CustomRequest, res: Response) => {
           {
             path: 'productId',
             model: 'Product',
-            select: 'name description MRP sellingPrice', // Specify fields for Product
+            select: 'name description MRP sellingPrice',
           },
           {
             path: 'bundleId',
             model: 'Bundle',
-            select: 'name description MRP sellingPrice products', // Specify fields for Bundle
+            select: 'name description MRP sellingPrice products',
           },
         ],
       })
-      .lean(); // Convert Mongoose document to plain JavaScript object
+      .lean();
 
     if (!cart) {
       return res.status(404).json({ message: 'Cart not found for user.' });
     }
 
-    // Aggregate items by type (productId or bundleId)
     const itemMap: { [key: string]: any } = {};
 
     cart.items.forEach((item: any) => {
@@ -54,7 +52,6 @@ export const getCartItems = async (req: CustomRequest, res: Response) => {
       }
     });
 
-    // Prepare final items array with aggregated quantities and required fields
     const items = Object.values(itemMap).map((item: any) => {
       if (item.productId) {
         return {

@@ -9,6 +9,7 @@ interface CartItem {
 interface ICart extends Document {
   userId: mongoose.Types.ObjectId;
   items: CartItem[];
+  totalPrice?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +46,10 @@ const cartSchema = new Schema<ICart>({
     unique: true,
   },
   items: [cartItemSchema],
+  totalPrice: {
+    type: Number,
+    default: 0,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

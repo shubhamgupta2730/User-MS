@@ -4,6 +4,13 @@ import Cart from '../../../models/cartModel';
 import Product from '../../../models/productModel';
 import Bundle from '../../../models/bundleProductModel';
 
+// Define the CartItem interface
+interface CartItem {
+  productId?: mongoose.Types.ObjectId;
+  bundleId?: mongoose.Types.ObjectId;
+  quantity: number;
+}
+
 interface CustomRequest extends Request {
   user?: {
     userId: string;
@@ -13,11 +20,7 @@ interface CustomRequest extends Request {
 
 export const addToCart = async (req: CustomRequest, res: Response) => {
   const userId = req.user?.userId;
-  const { productId, bundleId, quantity } = req.body;
-
-  if (!quantity || quantity < 1) {
-    return res.status(400).json({ message: 'Quantity must be at least 1.' });
-  }
+  const { productId, bundleId } = req.body;
 
   if (!productId && !bundleId) {
     return res.status(400).json({
@@ -35,7 +38,6 @@ export const addToCart = async (req: CustomRequest, res: Response) => {
     let cart = await Cart.findOne({ userId });
 
     if (!cart) {
-      // If no cart exists, create a new one
       cart = new Cart({ userId, items: [] });
     }
 
@@ -61,15 +63,11 @@ export const addToCart = async (req: CustomRequest, res: Response) => {
         item.productId?.equals(productId)
       );
 
-      if (existingProduct) {
-        existingProduct.quantity += quantity;
-      } else {
-        // Add new product to cart
-        cart.items.push({ productId, quantity });
+      if (!existingProduct) {
+        cart.items.push({ productId, quantity: 1 });
       }
     }
 
-    // Process bundle addition
     if (bundleId) {
       if (!mongoose.isValidObjectId(bundleId)) {
         return res.status(400).json({ message: 'Invalid bundle ID.' });
@@ -92,16 +90,17 @@ export const addToCart = async (req: CustomRequest, res: Response) => {
         item.bundleId?.equals(bundleId)
       );
 
-      if (existingBundle) {
-        // Update quantity if bundle already exists in the cart
-        existingBundle.quantity += quantity;
-      } else {
-        // Add new bundle to cart
-        cart.items.push({ bundleId, quantity });
+      if (!existingBundle) {
+        cart.items.push({ bundleId, quantity: 1 });
       }
     }
 
     cart.updatedAt = new Date();
+
+    // Calculate total price
+    const totalPrice = await calculateTotalPrice(cart.items);
+    cart.totalPrice = totalPrice;
+
     await cart.save();
 
     res.status(200).json({ message: 'Item added to cart successfully.', cart });
@@ -109,4 +108,29 @@ export const addToCart = async (req: CustomRequest, res: Response) => {
     console.error('Failed to add item to cart:', error);
     res.status(500).json({ message: 'Failed to add item to cart.', error });
   }
+};
+
+// Helper function to calculate total price
+const calculateTotalPrice = async (items: CartItem[]): Promise<number> => {
+  let totalPrice = 0;
+
+  for (const item of items) {
+    if (item.productId) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        const price =
+          product.sellingPrice > 0 ? product.sellingPrice : product.MRP;
+        totalPrice += price * item.quantity;
+      }
+    } else if (item.bundleId) {
+      const bundle = await Bundle.findById(item.bundleId);
+      if (bundle) {
+        const price =
+          bundle.sellingPrice > 0 ? bundle.sellingPrice : bundle.MRP;
+        totalPrice += price * item.quantity;
+      }
+    }
+  }
+
+  return totalPrice;
 };
