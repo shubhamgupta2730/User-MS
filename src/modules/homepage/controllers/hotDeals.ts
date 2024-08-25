@@ -52,7 +52,6 @@ export const getHotDeals = async (req: Request, res: Response) => {
             return {
               productId: bundleProduct.productId,
               productName: product ? product.name : 'Unknown',
-              quantity: bundleProduct.quantity,
             };
           })
         );
@@ -71,7 +70,7 @@ export const getHotDeals = async (req: Request, res: Response) => {
 
     const hotDeals = [...processedProducts, ...processedBundles]
       .sort((a, b) => b.effectiveDiscount - a.effectiveDiscount)
-      .slice(0, 10);
+      .slice(0, 30);
     res.status(200).json({
       message: 'Hot Deals retrieved successfully',
       data: hotDeals,

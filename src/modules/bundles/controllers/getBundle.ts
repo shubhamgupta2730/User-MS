@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Bundle from '../../../models/bundleProductModel';
 import Product from '../../../models/productModel';
-import Seller from '../../../models/sellerModel';
+import User from '../../../models/userModel';
 
 export const getBundleById = async (req: Request, res: Response) => {
   const bundleId = req.query.id as string;
@@ -33,13 +33,6 @@ export const getBundleById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Bundle not found' });
     }
 
-    const creatorDetails =
-      bundle.createdBy.role === 'seller'
-        ? await Seller.findOne({ userId: bundle.createdBy.id }).select(
-            'shopName shopDescription shopContactNumber website'
-          )
-        : null;
-
     const products = bundle.products.map((bundleProduct: any) => {
       const product = bundleProduct.productId as any;
       return {
@@ -55,14 +48,6 @@ export const getBundleById = async (req: Request, res: Response) => {
           name: product.categoryId?.name,
           description: product.categoryId?.description,
         },
-        seller: creatorDetails
-          ? {
-              shopName: creatorDetails.shopName,
-              shopDescription: creatorDetails.shopDescription,
-              shopContactNumber: creatorDetails.shopContactNumber,
-              website: creatorDetails.website,
-            }
-          : null,
       };
     });
 

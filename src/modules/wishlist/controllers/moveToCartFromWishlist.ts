@@ -93,13 +93,44 @@ export const moveItemFromWishlistToCart = async (
         (bundleId && !item.bundleId?.equals(bundleId))
     );
 
-    // Save the updated cart and wishlist
+    // Save the updated wishlist
     await wishlist.save();
+
+    // Save the updated cart
     await cart.save();
+
+    // Calculate the total price of the cart
+    let totalPrice = 0;
+    const updatedCart = await Cart.findOne({ userId })
+      .populate({
+        path: 'items',
+        populate: [
+          {
+            path: 'productId',
+            model: 'Product',
+            select: 'sellingPrice',
+          },
+          {
+            path: 'bundleId',
+            model: 'Bundle',
+            select: 'sellingPrice',
+          },
+        ],
+      })
+      .lean();
+
+    if (updatedCart) {
+      updatedCart.items.forEach((item: any) => {
+        const price = item.productId
+          ? item.productId.sellingPrice
+          : item.bundleId.sellingPrice;
+
+        totalPrice += price * item.quantity;
+      });
+    }
 
     res.status(200).json({
       message: 'Item moved from wishlist to cart successfully.',
-      cart,
     });
   } catch (error) {
     console.error('Failed to move item from wishlist to cart:', error);

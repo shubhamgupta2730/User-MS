@@ -36,19 +36,25 @@ export const getCartItems = async (req: CustomRequest, res: Response) => {
       return res.status(404).json({ message: 'Cart not found for user.' });
     }
 
+    let totalPrice = 0;
     const itemMap: { [key: string]: any } = {};
 
     cart.items.forEach((item: any) => {
       const id = item.productId?._id || item.bundleId?._id;
       if (id) {
+        const itemPrice = item.productId
+          ? item.productId.sellingPrice
+          : item.bundleId.sellingPrice;
         if (!itemMap[id]) {
           itemMap[id] = {
             ...item,
             quantity: 0,
             type: item.productId ? 'product' : 'bundle',
+            price: itemPrice,
           };
         }
         itemMap[id].quantity += item.quantity;
+        totalPrice += itemPrice * item.quantity;
       }
     });
 
@@ -80,9 +86,11 @@ export const getCartItems = async (req: CustomRequest, res: Response) => {
       }
     });
 
-    res
-      .status(200)
-      .json({ message: 'Cart items retrieved successfully.', items });
+    res.status(200).json({
+      message: 'Cart items retrieved successfully.',
+      items,
+      totalPrice, // Include the total price in the response
+    });
   } catch (error) {
     console.error('Failed to retrieve cart items:', error);
     res.status(500).json({ message: 'Failed to retrieve cart items.', error });

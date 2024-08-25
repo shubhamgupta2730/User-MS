@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
 import Category from '../../../models/categoryModel';
-import Product from '../../../models/productModel';
-import Bundle from '../../../models/bundleProductModel';
 import { SortOrder } from 'mongoose';
 
 export const getAllCategories = async (req: Request, res: Response) => {
@@ -28,43 +26,26 @@ export const getAllCategories = async (req: Request, res: Response) => {
     const pageSize = parseInt(limit as string, 10) || 10;
     const skip = (pageNumber - 1) * pageSize;
 
+    // Fetch categories with pagination, sorting, and filtering
     const categories = await Category.find(filter)
       .sort(sortOptions)
       .skip(skip)
       .limit(pageSize)
       .lean();
 
+    // Count total categories based on the filter
     const totalCategories = await Category.countDocuments(filter);
 
-    const populatedCategories = await Promise.all(
-      categories.map(async (category) => {
-        const products = await Product.find({
-          categoryId: category._id,
-          isActive: true,
-          isDeleted: false,
-          isBlocked: false,
-        }).select('name description MRP sellingPrice discount adminDiscount');
-
-        const bundles = await Bundle.find({
-          'products.productId': { $in: products.map((product) => product._id) },
-          isActive: true,
-          isDeleted: false,
-          isBlocked: false,
-        }).select('name description MRP sellingPrice discount adminDiscount');
-
-        return {
-          _id: category._id,
-          name: category.name,
-          description: category.description,
-          products,
-          bundles,
-        };
-      })
-    );
+    // Format the response
+    const formattedCategories = categories.map((category) => ({
+      _id: category._id,
+      name: category.name,
+      description: category.description,
+    }));
 
     res.status(200).json({
       message: 'Categories fetched successfully',
-      categories: populatedCategories,
+      categories: formattedCategories,
       totalCategories,
       totalPages: Math.ceil(totalCategories / pageSize),
       currentPage: pageNumber,

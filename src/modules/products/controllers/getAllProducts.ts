@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import Product from '../../../models/productModel';
-import Seller from '../../../models/sellerModel';
 
 export const getAllProducts = async (req: Request, res: Response) => {
   try {
@@ -24,51 +23,29 @@ export const getAllProducts = async (req: Request, res: Response) => {
     const products = await Product.find(searchFilter)
       .populate({
         path: 'categoryId',
-        select: 'name description',
+        select: 'name',
       })
       .sort(sortOptions)
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum)
-      .select(
-        'name description MRP sellingPrice quantity discount adminDiscount categoryId sellerId isActive isBlocked isDeleted createdBy createdAt updatedAt'
-      );
+      .select('name MRP sellingPrice categoryId');
 
     const totalProducts = await Product.countDocuments(searchFilter);
 
-    const response = await Promise.all(
-      products.map(async (product) => {
-        const category = product.categoryId as any;
+    const response = products.map((product) => {
+      const category = product.categoryId as any;
 
-        // Fetch the seller details from the Seller model using sellerId
-        const seller = await Seller.findOne({
-          userId: product.sellerId,
-        }).select('shopName shopDescription shopContactNumber website');
-
-        return {
-          _id: product._id,
-          name: product.name,
-          description: product.description,
-          MRP: product.MRP,
-          sellingPrice: product.sellingPrice,
-          quantity: product.quantity,
-          discount: product.discount,
-          adminDiscount: product.adminDiscount,
-          category: {
-            _id: category._id,
-            name: category.name,
-            description: category.description,
-          },
-          seller: seller
-            ? {
-                shopName: seller.shopName,
-                shopDescription: seller.shopDescription,
-                shopContactNumber: seller.shopContactNumber,
-                website: seller.website,
-              }
-            : null,
-        };
-      })
-    );
+      return {
+        _id: product._id,
+        name: product.name,
+        MRP: product.MRP,
+        sellingPrice: product.sellingPrice,
+        category: {
+          _id: category._id,
+          name: category.name,
+        },
+      };
+    });
 
     res.status(200).json({
       message: 'Products fetched successfully',

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Product from '../../../models/productModel';
-import Seller from '../../../models/sellerModel';
+import User from '../../../models/userModel';
 
 export const getProductById = async (req: Request, res: Response) => {
   const productId = req.query.id as string;
@@ -28,16 +28,17 @@ export const getProductById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    const seller = await Seller.findOne({ userId: product.createdBy }).select(
-      'shopName shopDescription shopContactNumber website'
+    const seller = await User.findOne({ _id: product.createdBy }).select(
+      'firstName lastName'
     );
 
     if (!seller) {
       return res.status(404).json({ message: 'Seller not found' });
     }
+
     const category = product.categoryId as any;
 
-    // Structure the response  ,
+    // Structure the response
     const response = {
       _id: product._id,
       name: product.name,
@@ -53,10 +54,7 @@ export const getProductById = async (req: Request, res: Response) => {
         description: category.description,
       },
       seller: {
-        shopName: seller.shopName,
-        shopDescription: seller.shopDescription,
-        shopContactNumber: seller.shopContactNumber,
-        website: seller.website,
+        name: `${seller.firstName} ${seller.lastName}`,
       },
     };
 
