@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
+import nodemailer from 'nodemailer'; // Import Nodemailer for sending emails
 import Order from '../../../models/orderModel';
 import User from '../../../models/userModel';
+import Product from '../../../models/productModel';
 import { IAddress } from '../../../models/userModel';
 
 interface CustomRequest extends Request {
@@ -11,9 +13,17 @@ interface CustomRequest extends Request {
   };
 }
 
-// Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2024-06-20',
+});
+
+// Email setup
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // Use your email service
+  auth: {
+    user: process.env.EMAIL_USER, // Your email address
+    pass: process.env.EMAIL_PASS, // Your email password or app-specific password
+  },
 });
 
 const validateAddress = (address: IAddress) => {
@@ -100,13 +110,11 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
     // Handle shipping address
     let addressToUse: IAddress;
     if (shippingAddress) {
-      // Retrieve the user and check if the address already exists
       const user = await User.findById(userId);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      // Check if the provided address already exists in the user's addresses
       const addressExists = user.address.some(
         (addr) =>
           addr.addressLine1 === shippingAddress.addressLine1 &&
@@ -118,7 +126,6 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       );
 
       if (!addressExists) {
-        // Add the address to the user's addresses if it's new
         await User.updateOne(
           { _id: userId },
           { $push: { address: shippingAddress } }
@@ -138,12 +145,55 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
     order.paymentMethod = paymentMethod;
 
     if (paymentMethodId) {
-      order.stripePaymentMethodId = paymentMethodId; // Store PaymentMethod ID
+      order.stripePaymentMethodId = paymentMethodId;
     }
 
-    // If payment method is COD, set the order status to 'processing'
+    // Set order and delivery dates
+    order.orderDate = new Date();
+    order.deliveryDate = new Date();
+    order.deliveryDate.setDate(order.orderDate.getDate() + 7);
+
+    // If payment method is COD, set the order status to 'processing' and update the quantity
     if (paymentMethod === 'COD') {
       order.status = 'processing';
+
+      for (const item of order.items) {
+        if (item.productId) {
+          const product = await Product.findById(item.productId);
+          if (product) {
+            if (product.quantity < item.quantity) {
+              return res.status(400).json({
+                message: `Not enough quantity available for ${product.name}`,
+              });
+            }
+            product.quantity -= item.quantity;
+            await product.save();
+          } else {
+            return res.status(404).json({ message: 'Product not found' });
+          }
+        }
+      }
+
+      // Send confirmation email for COD orders
+      const user = await User.findById(userId);
+      if (user && user.email) {
+        // Construct the items list
+        const itemsList = order.items
+          .map(
+            (item) =>
+              `Product: ${item.name}\nQuantity: ${item.quantity}\nPrice: Rs ${item.price}\n`
+          )
+          .join('\n');
+
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: user.email,
+          subject: 'Order Confirmation',
+          text: `Dear ${user.firstName},\n\nYour order has been placed successfully. Here are the details:\n\nOrder ID: ${order._id}\nTotal Amount: Rs ${order.totalAmount}\nShipping Address: ${order.shippingAddress.addressLine1}, ${order.shippingAddress.city}, ${order.shippingAddress.state}, ${order.shippingAddress.postalCode}, ${order.shippingAddress.country}\n\nItems Purchased:\n\n${itemsList}\nYour order will be delivered by ${order.deliveryDate.toDateString()}.\n\nThank you for shopping with us!\n\nBest regards,\nE-Commerce Platform`,
+        };
+
+        await transporter.sendMail(mailOptions);
+      }
     }
 
     await order.save();
@@ -157,7 +207,9 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
         paymentMethod: order.paymentMethod,
         totalAmount: order.totalAmount,
         status: order.status,
-        stripePaymentMethodId: paymentMethodId, // Include the PaymentMethod ID in the response
+        stripePaymentMethodId: paymentMethodId,
+        orderDate: order.orderDate,
+        deliveryDate: order.deliveryDate,
       },
     });
   } catch (error) {

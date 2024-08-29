@@ -8,8 +8,10 @@ import {
   authenticateUser,
   authorizeUser,
 } from '../../../middlewares/authMiddleware';
+import cancelOrder from '../controllers/cancelOrder';
 const router = express.Router();
 router.post('/place-order', authenticateUser, authorizeUser, placeOrder);
+router.post('/cancel-order', authenticateUser, authorizeUser, cancelOrder);
 router.get(
   '/get-order-details',
   authenticateUser,

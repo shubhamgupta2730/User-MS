@@ -47,11 +47,11 @@ const createPaymentIntent = async (req: Request, res: Response) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount,
       currency: currency,
-      payment_method: paymentMethodId, // Attach the payment method ID
-      confirm: true, // Confirm the PaymentIntent immediately
+      payment_method: paymentMethodId,
+      confirm: true,
       automatic_payment_methods: {
-        enabled: true, // Enable automatic payment methods
-        allow_redirects: 'never', // Avoid redirects
+        enabled: true,
+        allow_redirects: 'never',
       },
       metadata: { orderId: order._id.toString() },
     });

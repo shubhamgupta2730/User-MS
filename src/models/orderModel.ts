@@ -1,11 +1,13 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import { IAddress } from '../models/userModel';
+import { IProduct } from '../models/productModel';
+import { IBundleProduct } from '../models/bundleProductModel';
 
 export interface IOrder extends Document {
   userId: Types.ObjectId;
   items: {
-    productId?: Types.ObjectId;
-    bundleId?: Types.ObjectId;
+    productId?: Types.ObjectId | IProduct;
+    bundleId?: Types.ObjectId | IBundleProduct;
     quantity: number;
     price: number;
     name: string;
@@ -22,12 +24,17 @@ export interface IOrder extends Document {
   paymentStatus: 'unpaid' | 'paid' | 'failed';
   paymentMethod?: 'Card' | 'COD';
   shippingAddress?: IAddress;
-  stripePaymentIntentId?: string; // Adding Razorpay order ID
+  stripePaymentIntentId?: string;
   stripePaymentMethodId?: string;
   createdAt: Date;
   updatedAt: Date;
   orderDate: Date;
   deliveryDate?: Date;
+
+  refundStatus?: 'not_requested' | 'requested' | 'processing' | 'completed' | 'failed';
+  refundAmount?: number;
+  refundReason?: string; 
+  refundDate?: Date; 
 }
 
 const orderSchema = new Schema<IOrder>({
@@ -88,6 +95,15 @@ const orderSchema = new Schema<IOrder>({
   updatedAt: { type: Date, default: Date.now },
   orderDate: { type: Date, default: Date.now },
   deliveryDate: { type: Date, required: false },
+
+  refundStatus: {
+    type: String,
+    enum: ['not_requested', 'requested', 'processing', 'completed', 'failed'],
+    default: 'not_requested',
+  },
+  refundAmount: { type: Number, required: false },
+  refundReason: { type: String, required: false },
+  refundDate: { type: Date, required: false },
 });
 
 export default mongoose.model<IOrder>('Order', orderSchema);
