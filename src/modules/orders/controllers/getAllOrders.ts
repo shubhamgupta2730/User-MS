@@ -9,10 +9,8 @@ interface CustomRequest extends Request {
   };
 }
 
-
 const validSortFields = ['createdAt', 'totalAmount', 'status'] as const;
 type SortField = (typeof validSortFields)[number];
-
 
 type SortOrder = -1 | 1;
 
@@ -22,7 +20,6 @@ const getAllOrders = async (req: CustomRequest, res: Response) => {
     if (!userId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
-
 
     const {
       search = '',
@@ -34,9 +31,8 @@ const getAllOrders = async (req: CustomRequest, res: Response) => {
 
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
-    const sortField = sortBy as SortField; 
+    const sortField = sortBy as SortField;
     const sortOrder: SortOrder = order === 'desc' ? -1 : 1;
-
 
     const pipeline = [
       { $match: { userId: new mongoose.Types.ObjectId(userId) } },

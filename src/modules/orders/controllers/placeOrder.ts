@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
+import Stripe from 'stripe';
 import Order from '../../../models/orderModel';
-import Cart from '../../../models/cartModel';
-import Product from '../../../models/productModel';
-import Bundle from '../../../models/bundleProductModel';
 import User from '../../../models/userModel';
+import { IAddress } from '../../../models/userModel';
 
 interface CustomRequest extends Request {
   user?: {
@@ -12,15 +11,39 @@ interface CustomRequest extends Request {
   };
 }
 
-interface IAddress {
-  addressLine1: string;
-  addressLine2?: string;
-  street: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-}
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2024-06-20',
+});
+
+const validateAddress = (address: IAddress) => {
+  const { addressLine1, street, city, state, postalCode, country } = address;
+
+  if (
+    !addressLine1 ||
+    typeof addressLine1 !== 'string' ||
+    addressLine1.trim() === ''
+  ) {
+    return 'Address Line 1 is required and should be a non-empty string';
+  }
+  if (street && typeof street !== 'string') {
+    return 'Street should be a string';
+  }
+  if (city && typeof city !== 'string') {
+    return 'City should be a string';
+  }
+  if (state && typeof state !== 'string') {
+    return 'State should be a string';
+  }
+  if (postalCode && typeof postalCode !== 'string') {
+    return 'Postal Code should be a string';
+  }
+  if (country && typeof country !== 'string') {
+    return 'Country should be a string';
+  }
+
+  return null;
+};
 
 const placeOrder = async (req: CustomRequest, res: Response) => {
   try {
@@ -29,151 +52,63 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { productId, bundleId, paymentMethod, shippingAddress } = req.body;
+    const { shippingAddress, paymentMethod, paymentMethodToken } = req.body;
 
-    if ((!productId && !bundleId) || (productId && bundleId)) {
-      return res.status(400).json({
-        message: 'Provide either productId or bundleId, but not both.',
-      });
+    // Validate payment method
+    if (!['Card', 'COD'].includes(paymentMethod)) {
+      return res.status(400).json({ message: 'Invalid payment method' });
     }
 
-    const validPaymentMethods = ['credit_card', 'debit_card', 'UPI', 'COD'];
-    if (!validPaymentMethods.includes(paymentMethod)) {
-      return res.status(400).json({
-        message: `Invalid payment method. Allowed methods are: ${validPaymentMethods.join(', ')}`,
-      });
-    }
-
-    const [cart, user] = await Promise.all([
-      Cart.findOne({ userId }),
-      User.findById(userId),
-    ]);
-
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const orderItems = [];
-
-    let cartItem = null;
-    if (productId) {
-      const product = await Product.findById(productId);
-      if (!product) {
-        return res
-          .status(404)
-          .json({ message: `Product with ID ${productId} not found` });
-      }
-      if (!product.isActive || product.isBlocked || product.isDeleted) {
-        return res.status(400).json({
-          message: `Product with ID ${productId} is not available for purchase`,
-        });
-      }
-
-      // Check if the product is in the cart
-      cartItem = cart.items.find(
-        (item) => item.productId?.toString() === productId
-      );
-      const quantity = cartItem ? cartItem.quantity : 1;
-      if (product.quantity < quantity) {
-        return res.status(400).json({
-          message: `Insufficient quantity for product ID ${productId}`,
-        });
-      }
-
-      orderItems.push({
-        productId: productId,
-        quantity: quantity,
-        price: product.sellingPrice * quantity,
-      });
-    } else if (bundleId) {
-      const bundle = await Bundle.findById(bundleId);
-      if (!bundle) {
-        return res
-          .status(404)
-          .json({ message: `Bundle with ID ${bundleId} not found` });
-      }
-
-      // Check if the bundle is in the cart
-      cartItem = cart.items.find(
-        (item) => item.bundleId?.toString() === bundleId
-      );
-      const quantity = cartItem ? cartItem.quantity : 1;
-
-      orderItems.push({
-        bundleId: bundleId,
-        quantity: quantity,
-        price: bundle.sellingPrice * quantity,
-      });
-    }
-
-    for (const item of cart.items) {
-      if (
-        (productId && item.productId?.toString() === productId) ||
-        (bundleId && item.bundleId?.toString() === bundleId)
-      ) {
-        continue; // Skip if already added from req.body
-      }
-
-      if (item.productId) {
-        const product = await Product.findById(item.productId);
-        if (!product) {
-          return res
-            .status(404)
-            .json({ message: `Product with ID ${item.productId} not found` });
-        }
-        if (!product.isActive || product.isBlocked || product.isDeleted) {
-          return res.status(400).json({
-            message: `Product with ID ${item.productId} is not available for purchase`,
-          });
-        }
-        if (product.quantity < item.quantity) {
-          return res.status(400).json({
-            message: `Insufficient quantity for product ID ${item.productId}`,
-          });
-        }
-        orderItems.push({
-          productId: item.productId,
-          quantity: item.quantity,
-          price: product.sellingPrice * item.quantity,
-        });
-      } else if (item.bundleId) {
-        const bundle = await Bundle.findById(item.bundleId);
-        if (!bundle) {
-          return res
-            .status(404)
-            .json({ message: `Bundle with ID ${item.bundleId} not found` });
-        }
-        orderItems.push({
-          bundleId: item.bundleId,
-          quantity: item.quantity,
-          price: bundle.sellingPrice * item.quantity,
-        });
-      }
-    }
-
-    if (orderItems.length === 0) {
-      return res
-        .status(400)
-        .json({ message: 'No valid items found for the order' });
-    }
-
-    // Use provided shipping address or user's address
-    const orderShippingAddress: IAddress = shippingAddress || {
-      addressLine1: '',
-      street: '',
-      city: '',
-      state: '',
-      postalCode: '',
-      country: '',
-    };
-
-    // Add the shipping address to the user's address array if provided
+    // Validate shipping address
     if (shippingAddress) {
+      const validationError = validateAddress(shippingAddress);
+      if (validationError) {
+        return res.status(400).json({ message: validationError });
+      }
+    }
+
+    // Retrieve the most recent pending order
+    const order = await Order.findOne({ userId, status: 'pending' }).sort({
+      createdAt: -1,
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    let paymentMethodId: string | undefined;
+
+    // If the payment method is card, create a PaymentMethod using the token
+    if (paymentMethod === 'Card') {
+      if (!paymentMethodToken) {
+        return res.status(400).json({
+          message: 'Payment method token is required for card payments',
+        });
+      }
+
+      const paymentMethodResponse = await stripe.paymentMethods.create({
+        type: 'card',
+        card: { token: paymentMethodToken },
+        billing_details: {
+          name: req.user?.userId, // Example: Use user's ID or retrieve user's name from DB
+        },
+      });
+
+      paymentMethodId = paymentMethodResponse.id;
+    }
+
+    // Handle shipping address
+    let addressToUse: IAddress;
+    if (shippingAddress) {
+      // Retrieve the user and check if the address already exists
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Check if the provided address already exists in the user's addresses
       const addressExists = user.address.some(
-        (addr: IAddress) =>
+        (addr) =>
           addr.addressLine1 === shippingAddress.addressLine1 &&
           addr.street === shippingAddress.street &&
           addr.city === shippingAddress.city &&
@@ -183,34 +118,48 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       );
 
       if (!addressExists) {
-        user.address.push(shippingAddress);
-        await user.save();
+        // Add the address to the user's addresses if it's new
+        await User.updateOne(
+          { _id: userId },
+          { $push: { address: shippingAddress } }
+        );
       }
+
+      addressToUse = shippingAddress;
+    } else {
+      const user = await User.findById(userId);
+      if (!user || user.address.length === 0) {
+        return res.status(400).json({ message: 'No address available' });
+      }
+      addressToUse = user.address[user.address.length - 1];
     }
 
-    // Calculate total amount
-    const totalAmount = orderItems.reduce(
-      (total, item) => total + item.price,
-      0
-    );
+    order.shippingAddress = addressToUse;
+    order.paymentMethod = paymentMethod;
 
-    // Create order
-    const order = new Order({
-      userId,
-      items: orderItems,
-      totalAmount,
-      status: 'pending',
-      paymentStatus: 'unpaid',
-      paymentMethod,
-      shippingAddress: orderShippingAddress,
-    });
+    if (paymentMethodId) {
+      order.stripePaymentMethodId = paymentMethodId; // Store PaymentMethod ID
+    }
+
+    // If payment method is COD, set the order status to 'processing'
+    if (paymentMethod === 'COD') {
+      order.status = 'processing';
+    }
 
     await order.save();
 
-    // Clear the cart after placing the order
-    await Cart.findOneAndUpdate({ userId }, { $set: { items: [] } });
-
-    res.status(201).json({ message: 'Order placed successfully', order });
+    res.status(200).json({
+      message: 'Order placed successfully',
+      order: {
+        _id: order._id,
+        userId: order.userId,
+        shippingAddress: order.shippingAddress,
+        paymentMethod: order.paymentMethod,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        stripePaymentMethodId: paymentMethodId, // Include the PaymentMethod ID in the response
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Internal Server Error', error });
   }

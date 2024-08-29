@@ -21,13 +21,11 @@ const getOrderDetails = async (req: CustomRequest, res: Response) => {
       return res.status(400).json({ message: 'Invalid or missing orderId' });
     }
 
-
     const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-
 
     if (order.userId.toString() !== userId) {
       return res.status(403).json({ message: 'Access denied' });
