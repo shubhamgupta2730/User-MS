@@ -30,8 +30,8 @@ const refundWebhookHandler = async (req: Request, res: Response) => {
       // Update the order based on the refund event
       if (event.type === 'refund.created') {
         order.refundStatus = 'requested';
-        order.refundAmount = (refund.amount / 100) as number; 
-        order.refundDate = new Date(refund.created * 1000); 
+        order.refundAmount = (refund.amount / 100) as number;
+        order.refundDate = new Date(refund.created * 1000);
         // Optionally store refund reason if available
         if (refund.reason) {
           order.refundReason = refund.reason;
@@ -52,7 +52,6 @@ const refundWebhookHandler = async (req: Request, res: Response) => {
       await order.save();
     }
   }
-
 
   res.json({ received: true });
 };

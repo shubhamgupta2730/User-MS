@@ -31,10 +31,15 @@ export interface IOrder extends Document {
   orderDate: Date;
   deliveryDate?: Date;
 
-  refundStatus?: 'not_requested' | 'requested' | 'processing' | 'completed' | 'failed';
+  refundStatus?:
+    | 'not_requested'
+    | 'requested'
+    | 'processing'
+    | 'completed'
+    | 'failed';
   refundAmount?: number;
-  refundReason?: string; 
-  refundDate?: Date; 
+  refundReason?: string;
+  refundDate?: Date;
 }
 
 const orderSchema = new Schema<IOrder>({

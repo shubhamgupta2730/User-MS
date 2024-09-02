@@ -54,7 +54,6 @@ const webhookHandler = async (req: Request, res: Response) => {
           product.quantity -= item.quantity; // Deduct the quantity
           await product.save();
         }
-
       }
 
       // Construct the items list for the email

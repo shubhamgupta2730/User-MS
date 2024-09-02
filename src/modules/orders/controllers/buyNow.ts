@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import Order, { IOrder } from '../../../models/orderModel'; // Updated to use Order model
+import Order, { IOrder } from '../../../models/orderModel';
 import Cart from '../../../models/cartModel';
 import Product, { IProduct } from '../../../models/productModel';
 import Bundle from '../../../models/bundleProductModel';
@@ -144,7 +144,7 @@ const buyNow = async (req: CustomRequest, res: Response) => {
       message: 'Item added successfully',
       order: {
         id: _id,
-        items, // Return 'items' instead of 'item'
+        items,
         totalAmount,
       },
     });
