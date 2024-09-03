@@ -11,6 +11,7 @@ interface CustomRequest extends Request {
     role: 'user';
   };
 }
+
 // Set up Multer for local image storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -27,7 +28,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).array('images', 5);
 
-const addReview = async (req: CustomRequest, res: Response) => {
+const updateReview = async (req: CustomRequest, res: Response) => {
   upload(req, res, async (err) => {
     try {
       if (err) {
@@ -36,41 +37,52 @@ const addReview = async (req: CustomRequest, res: Response) => {
           .json({ message: 'Image upload failed', error: err.message });
       }
 
-      const { orderId, productId, bundleId, rating, reviewText } = req.body;
+      const { reviewId } = req.query;
+      const { rating, reviewText, productId, bundleId, images } = req.body;
       const userId = req.user?.userId;
 
-      // Validate inputs
+      // Validate input data
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
-      if (!orderId) {
-        return res.status(400).json({ message: 'Order ID is required' });
+
+      if (!reviewId) {
+        return res.status(400).json({ message: 'Review ID is required' });
       }
+
+      // Find the review
+      const review = await Review.findById(reviewId);
+      if (!review || review.isDeleted) {
+        return res
+          .status(404)
+          .json({ message: 'Review not found or already deleted' });
+      }
+
+      // Validate that the user owns the review
+      if (review.userId.toString() !== userId) {
+        return res.status(403).json({ message: 'Forbidden: Not your review' });
+      }
+
+      // Validate that the associated order is delivered
+      const order = await Order.findById(review.orderId);
+      if (!order || order.status !== 'delivered') {
+        return res
+          .status(400)
+          .json({ message: 'Review can only be updated for delivered orders' });
+      }
+
       // Validate that only one of productId or bundleId is provided
       if ((!productId && !bundleId) || (productId && bundleId)) {
         return res.status(400).json({
           message: 'Provide either productId or bundleId, but not both.',
         });
       }
+
+      // Validate the rating
       if (!rating || isNaN(rating) || rating < 1 || rating > 5) {
         return res
           .status(400)
           .json({ message: 'Rating must be a number between 1 and 5' });
-      }
-
-      // Find the order and validate user ownership
-      const order = await Order.findById(orderId);
-      if (!order || order.userId.toString() !== userId) {
-        return res
-          .status(404)
-          .json({ message: 'Order not found or unauthorized' });
-      }
-
-      // Check if the order status is 'delivered'
-      if (order.status !== 'delivered') {
-        return res
-          .status(400)
-          .json({ message: 'Review can only be added for delivered orders' });
       }
 
       // Validate the productId or bundleId against the items in the order
@@ -97,26 +109,36 @@ const addReview = async (req: CustomRequest, res: Response) => {
         }
       }
 
-      // Save images to local system and get their paths
-      const images = req.files
-        ? (req.files as Express.Multer.File[]).map((file) => file.path)
-        : [];
+      // Update images if new ones are provided
+      let updatedImages = review.images; // Keep existing images
+      if (Array.isArray(images) && images.length > 0) {
+        // If images are provided in req.body, use them
+        updatedImages = images;
+      } else if (Array.isArray(req.files) && req.files.length > 0) {
+        // Delete old images from the file system
+        if (updatedImages && updatedImages.length > 0) {
+          updatedImages.forEach((imagePath) => {
+            const fullPath = path.join(__dirname, '../../../', imagePath);
+            if (fs.existsSync(fullPath)) {
+              fs.unlinkSync(fullPath);
+            }
+          });
+        }
+        // Save new image paths
+        updatedImages = req.files.map((file) => file.path);
+      }
 
-      // Create a new review
-      const review = new Review({
-        userId,
-        orderId,
-        productId: productId || undefined,
-        bundleId: bundleId || undefined,
-        rating,
-        reviewText: reviewText || '',
-        images,
-      });
+      // Update the review fields
+      review.rating = rating;
+      review.reviewText = reviewText || review.reviewText;
+      review.images = updatedImages;
+      review.productId = productId || review.productId;
+      review.bundleId = bundleId || review.bundleId;
 
-      // Save the review to the database
+      // Save the updated review
       await review.save();
 
-      res.status(201).json({ message: 'Review added successfully', review });
+      res.status(200).json({ message: 'Review updated successfully', review });
     } catch (error) {
       const err = error as Error;
       res
@@ -126,4 +148,4 @@ const addReview = async (req: CustomRequest, res: Response) => {
   });
 };
 
-export default addReview;
+export default updateReview;

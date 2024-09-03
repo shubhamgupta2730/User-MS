@@ -8,7 +8,9 @@ interface IReview extends Document {
   rating: number;
   reviewText: string;
   images: string[];
-  isDeleted: boolean; 
+  isDeleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const ReviewSchema: Schema = new Schema(
@@ -28,7 +30,9 @@ const ReviewSchema: Schema = new Schema(
     rating: { type: Number, required: true },
     reviewText: { type: String, required: false },
     images: [{ type: String }],
-    isDeleted: { type: Boolean, default: false }, 
+    isDeleted: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );

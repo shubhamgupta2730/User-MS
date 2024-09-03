@@ -2,6 +2,22 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Product from '../../../models/productModel';
 import User from '../../../models/userModel';
+import Review from '../../../models/reviewModel';
+import { Document, ObjectId } from 'mongoose';
+
+interface IReview extends Document {
+  userId: {
+    _id: ObjectId;
+    firstName: string;
+    lastName: string;
+  };
+  productId: ObjectId;
+  rating: number;
+  reviewText: string;
+  images: string[];
+  createdAt: Date;
+  isDeleted: boolean;
+}
 
 export const getProductById = async (req: Request, res: Response) => {
   const productId = req.query.id as string;
@@ -36,7 +52,23 @@ export const getProductById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Seller not found' });
     }
 
+    // Fetch reviews related to the product
+    const reviews = await Review.find({
+      productId: product._id,
+      isDeleted: false,
+    })
+      .select('rating reviewText images userId createdAt')
+      .populate({
+        path: 'userId',
+        select: 'firstName lastName',
+      });
+
     const category = product.categoryId as any;
+
+    // Helper function to format date
+    const formatDate = (date: Date) => {
+      return `${date.toLocaleDateString()} `;
+    };
 
     // Structure the response
     const response = {
@@ -54,8 +86,19 @@ export const getProductById = async (req: Request, res: Response) => {
         description: category.description,
       },
       seller: {
+        id: seller._id,
         name: `${seller.firstName} ${seller.lastName}`,
       },
+      reviews: reviews.map((review) => ({
+        _id: review._id,
+        rating: review.rating,
+        reviewText: review.reviewText,
+        images: review.images,
+        user: {
+          name: `${(review.userId as any).firstName} ${(review.userId as any).lastName}`,
+        },
+        createdAt: formatDate(review.createdAt),
+      })),
     };
 
     res.status(200).json({
