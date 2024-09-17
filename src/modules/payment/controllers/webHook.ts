@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import Order from '../../../models/orderModel';
-import Product from '../../../models/productModel'; // Import the Product model
+import Product from '../../../models/productModel';
 import { sendEmail } from '../../../utils/sendMail';
+import axios from 'axios'; // Import axios
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2024-06-20',
@@ -60,7 +61,6 @@ const webhookHandler = async (req: Request, res: Response) => {
       const itemsList = order.items
         .map(
           (item) =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             `Product: ${item.productId ? (item.productId as any).name : (item.bundleId as any)?.name}\nQuantity: ${item.quantity}\nPrice: Rs ${item.price}\n`
         )
         .join('\n');
@@ -91,6 +91,20 @@ const webhookHandler = async (req: Request, res: Response) => {
 
       // Send the confirmation email to the user
       await sendEmail((order.userId as any).email, emailSubject, emailHtml);
+
+      // Call the scheduler microservice to update the order status to delivered after 5 minutes
+      try {
+        // Schedule status update to "delivered" after 5 minutes
+        await axios.post(`http://localhost:3005/schedule-delivery`, {
+          orderId: orderId,
+        });
+        console.log(`Scheduler service notified for Order ID: ${order._id}`);
+      } catch (error) {
+        console.error(
+          `Failed to notify scheduler service for Order ID: ${order._id}`,
+          error
+        );
+      }
       break;
 
     case 'payment_intent.payment_failed':

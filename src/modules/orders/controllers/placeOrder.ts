@@ -1,9 +1,12 @@
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
-import nodemailer from 'nodemailer'; // Import Nodemailer for sending emails
+import nodemailer from 'nodemailer';
+import axios from 'axios';
 import Order from '../../../models/orderModel';
 import User from '../../../models/userModel';
 import Product from '../../../models/productModel';
+import Coupon from '../../../models/couponModel';
+import CouponUsage from '../../../models/couponUsage';
 import { IAddress } from '../../../models/userModel';
 
 interface CustomRequest extends Request {
@@ -19,13 +22,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 
 // Email setup
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Use your email service
+  service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER, // Your email address
-    pass: process.env.EMAIL_PASS, // Your email password or app-specific password
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
+// Address validation helper function
 const validateAddress = (address: IAddress) => {
   const { addressLine1, street, city, state, postalCode, country } = address;
 
@@ -62,7 +66,8 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { shippingAddress, paymentMethod, paymentMethodToken } = req.body;
+    const { shippingAddress, paymentMethod, paymentMethodToken, couponCode } =
+      req.body;
 
     // Validate payment method
     if (!['Card', 'COD'].includes(paymentMethod)) {
@@ -86,6 +91,79 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    // Coupon application logic
+    let discountAmount = 0;
+    if (couponCode) {
+      const coupon = await Coupon.findOne({
+        code: couponCode,
+        isDeleted: false,
+      });
+
+      if (!coupon) {
+        return res.status(400).json({ message: 'Invalid or expired coupon' });
+      }
+
+      // Check coupon validity (validFrom, validUntil)
+      const currentDate = new Date();
+      if (coupon.validFrom && coupon.validFrom > currentDate) {
+        return res.status(400).json({ message: 'Coupon not yet valid' });
+      }
+      if (coupon.validUntil && coupon.validUntil < currentDate) {
+        return res.status(400).json({ message: 'Coupon has expired' });
+      }
+
+      // Check if the order total meets the minimum order value
+      if (coupon.minOrderValue && order.totalAmount < coupon.minOrderValue) {
+        return res.status(400).json({
+          message: `Minimum order value to use this coupon is ${coupon.minOrderValue}`,
+        });
+      }
+
+      // Check the global usage limit of the coupon
+      if (coupon.usageCount >= coupon.usageLimit) {
+        return res.status(400).json({
+          message: 'This coupon has reached its usage limit.',
+        });
+      }
+
+      // Check the user's coupon usage count
+      const couponUsage = await CouponUsage.findOne({ userId, couponCode });
+      const userUsageCount = couponUsage ? couponUsage.usageCount : 0;
+
+      // Enforce the per-user usage limit
+      if (couponUsage && userUsageCount >= coupon.usageLimit) {
+        return res.status(400).json({
+          message: `You have reached the usage limit for this coupon.`,
+        });
+      }
+
+      // Apply the coupon based on discount type
+      if (coupon.discountType === 'percentage') {
+        discountAmount = (order.totalAmount * coupon.discountValue) / 100;
+      } else if (coupon.discountType === 'flat') {
+        discountAmount = coupon.discountValue;
+      }
+
+      // Ensure the discount doesn't exceed the total amount
+      discountAmount = Math.min(discountAmount, order.totalAmount);
+
+      // Update order total amount after discount
+      order.totalAmount -= discountAmount;
+
+      // Increment coupon usage count (global usage)
+      coupon.usageCount += 1;
+      await coupon.save();
+
+      // Update coupon usage count for the user
+      if (couponUsage) {
+        couponUsage.usageCount += 1;
+        await couponUsage.save();
+      } else {
+        // Create a new CouponUsage record for the user
+        await CouponUsage.create({ userId, couponCode, usageCount: 1 });
+      }
+    }
+
     let paymentMethodId: string | undefined;
 
     // If the payment method is card, create a PaymentMethod using the token
@@ -100,7 +178,7 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
         type: 'card',
         card: { token: paymentMethodToken },
         billing_details: {
-          name: req.user?.userId, // Example: Use user's ID or retrieve user's name from DB
+          name: req.user?.userId,
         },
       });
 
@@ -150,13 +228,12 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
 
     // Set order and delivery dates
     order.orderDate = new Date();
-    order.deliveryDate = new Date();
-    order.deliveryDate.setDate(order.orderDate.getDate() + 7);
 
-    // If payment method is COD, set the order status to 'processing' and update the quantity
     if (paymentMethod === 'COD') {
+      order.deliveryDate = new Date(); // Set delivery date as today for COD
       order.status = 'processing';
 
+      // Deduct product quantity
       for (const item of order.items) {
         if (item.productId) {
           const product = await Product.findById(item.productId);
@@ -177,7 +254,6 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       // Send confirmation email for COD orders
       const user = await User.findById(userId);
       if (user && user.email) {
-        // Construct the items list
         const itemsList = order.items
           .map(
             (item) =>
@@ -189,11 +265,16 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
           from: process.env.EMAIL_USER,
           to: user.email,
           subject: 'Order Confirmation',
-          text: `Dear ${user.firstName},\n\nYour order has been placed successfully. Here are the details:\n\nOrder ID: ${order._id}\nTotal Amount: Rs ${order.totalAmount}\nShipping Address: ${order.shippingAddress.addressLine1}, ${order.shippingAddress.city}, ${order.shippingAddress.state}, ${order.shippingAddress.postalCode}, ${order.shippingAddress.country}\n\nItems Purchased:\n\n${itemsList}\nYour order will be delivered by ${order.deliveryDate.toDateString()}.\n\nThank you for shopping with us!\n\nBest regards,\nE-Commerce Platform`,
+          text: `Dear ${user.firstName},\n\nYour order has been placed successfully. Here are the details:\n\nOrder ID: ${order._id}\nTotal Amount: Rs ${order.totalAmount}\nDiscount: Rs ${discountAmount}\nShipping Address: ${order.shippingAddress.addressLine1}, ${order.shippingAddress.city}, ${order.shippingAddress.state}, ${order.shippingAddress.postalCode}, ${order.shippingAddress.country}\n\nItems Purchased:\n\n${itemsList}\nYour order will be delivered today.\n\nThank you for shopping with us!\n\nBest regards,\nE-Commerce Platform`,
         };
 
         await transporter.sendMail(mailOptions);
       }
+
+      // Schedule status update to "delivered" after 5 minutes
+      await axios.post(`http://localhost:3005/schedule-delivery`, {
+        orderId: order._id,
+      });
     }
 
     await order.save();
@@ -206,6 +287,7 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
         shippingAddress: order.shippingAddress,
         paymentMethod: order.paymentMethod,
         totalAmount: order.totalAmount,
+        discountAmount,
         status: order.status,
         stripePaymentMethodId: paymentMethodId,
         orderDate: order.orderDate,
