@@ -92,7 +92,7 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
     }
 
     // Coupon application logic
-    let discountAmount = 0;
+    let discountAmount = 0; 
     if (couponCode) {
       const coupon = await Coupon.findOne({
         code: couponCode,
@@ -136,7 +136,6 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
           message: `You have reached the usage limit for this coupon.`,
         });
       }
-
       // Apply the coupon based on discount type
       if (coupon.discountType === 'percentage') {
         discountAmount = (order.totalAmount * coupon.discountValue) / 100;
