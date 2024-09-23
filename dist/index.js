@@ -10,29 +10,18 @@ const db_1 = __importDefault(require("./config/db"));
 // import morgan from 'morgan';
 // import requestLogger from './middlewares/requestLogger';
 const userRoutes_1 = __importDefault(require("../src/routes/userRoutes"));
+const webhookRoute_1 = __importDefault(require("../src/modules/payment/routes/webhookRoute"));
 const logger_1 = require("./logger");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-// Define the stream object with the expected write function
-// const stream = {
-//   write: (message: string) => {
-//     logger.info(message.trim());
-//   },
-// };
-// Skip logging during tests
-// const skip = () => {
-//   const env = process.env.NODE_ENV || 'development';
-//   return env === 'test';
-// };
 // Connect to database
 (0, db_1.default)();
+app.use('/api/v1/user/paymentRoute', webhookRoute_1.default);
 // Middleware
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
-// Use morgan middleware for logging HTTP requests
-// app.use(morgan('combined', { stream, skip }));
-// app.use(requestLogger);
+app.use(express_1.default.raw({ type: 'application/json' }));
 // Routes
 app.use('/api/v1/user', userRoutes_1.default);
 app.listen(PORT, () => {

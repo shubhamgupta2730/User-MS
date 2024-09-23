@@ -13,7 +13,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
-const orderModel_1 = __importDefault(require("../../../models/orderModel")); // Updated to use Order model
+const orderModel_1 = __importDefault(require("../../../models/orderModel"));
 const cartModel_1 = __importDefault(require("../../../models/cartModel"));
 const productModel_1 = __importDefault(require("../../../models/productModel"));
 const bundleProductModel_1 = __importDefault(require("../../../models/bundleProductModel"));
@@ -40,7 +40,7 @@ const buyNow = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             return res.status(400).json({ message: 'Invalid bundleId format' });
         }
         const cart = yield cartModel_1.default.findOne({ userId });
-        let orderItems = []; // Define the type according to your actual data structure
+        const orderItems = []; // Define the type according to your actual data structure
         if (productId) {
             const product = yield productModel_1.default.findById(productId);
             if (!product) {
@@ -114,7 +114,7 @@ const buyNow = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const order = new orderModel_1.default({
             userId,
             items: orderItems, // Use 'items' field instead of 'item'
-            totalAmount: orderItems.reduce((total, item) => total + (item.price * item.quantity), 0),
+            totalAmount: orderItems.reduce((total, item) => total + item.price * item.quantity, 0),
             status: 'pending',
             paymentStatus: 'unpaid',
             createdAt: new Date(),
@@ -128,7 +128,7 @@ const buyNow = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             message: 'Item added successfully',
             order: {
                 id: _id,
-                items, // Return 'items' instead of 'item'
+                items,
                 totalAmount,
             },
         });

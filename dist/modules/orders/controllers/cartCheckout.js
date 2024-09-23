@@ -101,7 +101,7 @@ const cartCheckout = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             _id: order._id,
             userId: order.userId,
             totalAmount: order.totalAmount,
-            items: order.items.map(item => ({
+            items: order.items.map((item) => ({
                 productId: item.productId,
                 bundleId: item.bundleId,
                 name: item.name,
@@ -110,7 +110,9 @@ const cartCheckout = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 MRP: item.MRP,
             })),
         };
-        res.status(200).json({ message: 'Checkout successful', order: responseOrder });
+        res
+            .status(200)
+            .json({ message: 'Checkout successful', order: responseOrder });
     }
     catch (error) {
         res.status(500).json({ message: 'Internal Server Error', error });

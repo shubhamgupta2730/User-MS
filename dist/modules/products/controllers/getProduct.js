@@ -16,6 +16,7 @@ exports.getProductById = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const productModel_1 = __importDefault(require("../../../models/productModel"));
 const userModel_1 = __importDefault(require("../../../models/userModel"));
+const reviewModel_1 = __importDefault(require("../../../models/reviewModel"));
 const getProductById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const productId = req.query.id;
     if (!productId) {
@@ -38,7 +39,21 @@ const getProductById = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!seller) {
             return res.status(404).json({ message: 'Seller not found' });
         }
+        // Fetch reviews related to the product
+        const reviews = yield reviewModel_1.default.find({
+            productId: product._id,
+            isDeleted: false,
+        })
+            .select('rating reviewText images userId createdAt')
+            .populate({
+            path: 'userId',
+            select: 'firstName lastName',
+        });
         const category = product.categoryId;
+        // Helper function to format date
+        const formatDate = (date) => {
+            return `${date.toLocaleDateString()} `;
+        };
         // Structure the response
         const response = {
             _id: product._id,
@@ -55,8 +70,19 @@ const getProductById = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 description: category.description,
             },
             seller: {
+                id: seller._id,
                 name: `${seller.firstName} ${seller.lastName}`,
             },
+            reviews: reviews.map((review) => ({
+                _id: review._id,
+                rating: review.rating,
+                reviewText: review.reviewText,
+                images: review.images,
+                user: {
+                    name: `${review.userId.firstName} ${review.userId.lastName}`,
+                },
+                createdAt: formatDate(review.createdAt),
+            })),
         };
         res.status(200).json({
             message: 'Product fetched successfully',

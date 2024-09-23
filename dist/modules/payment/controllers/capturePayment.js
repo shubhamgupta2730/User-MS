@@ -12,58 +12,57 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const razorpay_1 = __importDefault(require("razorpay"));
+const stripe_1 = __importDefault(require("stripe"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const orderModel_1 = __importDefault(require("../../../models/orderModel"));
-const razorpay = new razorpay_1.default({
-    key_id: process.env.KEY_ID,
-    key_secret: process.env.KEY_SECRET,
+const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2024-06-20',
 });
-const validCurrencies = ['INR', 'USD', 'EUR']; // Example of valid currencies, adjust as needed
-const capturePayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createPaymentIntent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { orderId, currency } = req.body;
+        const { orderId, currency, paymentMethodId } = req.body;
         // Validate input
         if (!orderId || !mongoose_1.default.Types.ObjectId.isValid(orderId)) {
             return res.status(400).json({ message: 'Invalid orderId format' });
         }
-        if (!currency || typeof currency !== 'string' || !validCurrencies.includes(currency)) {
-            return res.status(400).json({ message: 'Invalid or unsupported currency' });
+        if (!currency) {
+            return res.status(400).json({ message: 'Currency is required' });
         }
-        // Retrieve the order to get the totalAmount and check payment status
-        const order = yield orderModel_1.default.findById(orderId);
+        if (!paymentMethodId) {
+            return res.status(400).json({ message: 'Payment method ID is required' });
+        }
+        // Retrieve the order
+        const order = (yield orderModel_1.default.findById(orderId));
         if (!order) {
             return res.status(404).json({ message: 'Order not found' });
         }
         if (order.paymentStatus === 'paid') {
-            return res.status(400).json({ message: 'Payment has already been completed for this order' });
+            return res
+                .status(400)
+                .json({ message: 'Payment has already been completed for this order' });
         }
-        if (order.razorpayOrderId) {
-            return res.status(400).json({ message: 'Payment initiation has already been done for this order' });
-        }
-        const amount = order.totalAmount * 100; // Razorpay expects the amount in paise (smallest currency unit)
-        // Create Razorpay order
-        const razorpayOrder = yield razorpay.orders.create({
+        const amount = order.totalAmount * 100;
+        // Create and confirm a PaymentIntent with automatic payment methods
+        const paymentIntent = yield stripe.paymentIntents.create({
             amount: amount,
             currency: currency,
-            receipt: orderId,
-            payment_capture: true, // Razorpay expects a boolean for payment_capture
+            payment_method: paymentMethodId,
+            confirm: true,
+            automatic_payment_methods: {
+                enabled: true,
+                allow_redirects: 'never',
+            },
+            metadata: { orderId: order._id.toString() },
         });
-        if (!razorpayOrder) {
-            return res.status(500).json({ message: 'Failed to create Razorpay order' });
-        }
-        // Save Razorpay order ID to the database to prevent duplicate payment attempts
-        order.razorpayOrderId = razorpayOrder.id;
+        // Save the PaymentIntent ID to the order
+        order.stripePaymentIntentId = paymentIntent.id;
         yield order.save();
         res.status(200).json({
-            orderId: orderId,
-            razorpayOrderId: razorpayOrder.id,
-            amount: amount / 100, // Convert back to main currency unit
-            currency: currency,
+            message: 'payment initiated to payment gateway',
         });
     }
     catch (error) {
         res.status(500).json({ message: 'Internal Server Error', error });
     }
 });
-exports.default = capturePayment;
+exports.default = createPaymentIntent;

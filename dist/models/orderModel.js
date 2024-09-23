@@ -47,7 +47,14 @@ const orderSchema = new mongoose_1.Schema({
     totalAmount: { type: Number, required: true },
     status: {
         type: String,
-        enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+        enum: [
+            'pending',
+            'processing',
+            'shipped',
+            'delivered',
+            'cancelled',
+            'failed',
+        ],
         default: 'pending',
     },
     paymentStatus: {
@@ -57,7 +64,7 @@ const orderSchema = new mongoose_1.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['Credit Card', 'UPI', 'Debit Card', 'COD'],
+        enum: ['Card', 'COD'],
         required: false,
     },
     shippingAddress: {
@@ -69,10 +76,19 @@ const orderSchema = new mongoose_1.Schema({
         postalCode: { type: String, required: false },
         country: { type: String, required: false },
     },
-    razorpayOrderId: { type: String, required: false }, // Added Razorpay order ID
+    stripePaymentIntentId: { type: String, required: false },
+    stripePaymentMethodId: { type: String, required: false },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     orderDate: { type: Date, default: Date.now },
     deliveryDate: { type: Date, required: false },
+    refundStatus: {
+        type: String,
+        enum: ['not_requested', 'requested', 'processing', 'completed', 'failed'],
+        default: 'not_requested',
+    },
+    refundAmount: { type: Number, required: false },
+    refundReason: { type: String, required: false },
+    refundDate: { type: Date, required: false },
 });
 exports.default = mongoose_1.default.model('Order', orderSchema);

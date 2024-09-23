@@ -13,6 +13,7 @@ const wishlistRoutes_1 = __importDefault(require("../modules/wishlist/routes/wis
 const homepageRoute_1 = __importDefault(require("../modules/homepage/routes/homepageRoute"));
 const orderRoutes_1 = __importDefault(require("../modules/orders/routes/orderRoutes"));
 const paymentRoute_1 = __importDefault(require("../modules/payment/routes/paymentRoute"));
+const reviewRoute_1 = __importDefault(require("../modules/reviews/routes/reviewRoute"));
 router.use('/categoryRoute', categoryRoutes_1.default);
 router.use('/productRoute', productRoutes_1.default);
 router.use('/bundleRoute', bundleRoute_1.default);
@@ -21,4 +22,5 @@ router.use('/wishlistRoute', wishlistRoutes_1.default);
 router.use('/homepageRoute', homepageRoute_1.default);
 router.use('/orderRoute', orderRoutes_1.default);
 router.use('/paymentRoute', paymentRoute_1.default);
+router.use('/reviewRoute', reviewRoute_1.default);
 exports.default = router;
