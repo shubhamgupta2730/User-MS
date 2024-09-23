@@ -9,10 +9,8 @@ const db_1 = __importDefault(require("./config/db"));
 // import { logger } from './logger';
 // import morgan from 'morgan';
 // import requestLogger from './middlewares/requestLogger';
-const userRoutes_1 = __importDefault(require("../src/routes/userRoutes"));
-const webhookRoute_1 = __importDefault(
-  require('../src/modules/payment/routes/webhookRoute')
-);
+const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
+const webhookRoute_1 = __importDefault(require("./modules/payment/routes/webhookRoute"));
 const logger_1 = require("./logger");
 dotenv_1.default.config();
 const app = (0, express_1.default)();

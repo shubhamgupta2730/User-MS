@@ -5,8 +5,8 @@ import bodyParser from 'body-parser';
 // import { logger } from './logger';
 // import morgan from 'morgan';
 // import requestLogger from './middlewares/requestLogger';
-import userRoutes from '../src/routes/userRoutes';
-import webhookRoute from '../src/modules/payment/routes/webhookRoute';
+import userRoutes from './routes/userRoutes';
+import webhookRoute from './modules/payment/routes/webhookRoute';
 import { logger } from './logger';
 dotenv.config();
 
