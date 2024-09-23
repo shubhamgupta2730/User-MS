@@ -92,7 +92,7 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
     }
 
     // Coupon application logic
-    let discountAmount = 0; 
+    let discountAmount = 0;
     if (couponCode) {
       const coupon = await Coupon.findOne({
         code: couponCode,
