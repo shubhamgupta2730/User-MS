@@ -1,0 +1,24 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const router = express_1.default.Router();
+const categoryRoutes_1 = __importDefault(require("../modules/category/routes/categoryRoutes"));
+const productRoutes_1 = __importDefault(require("../modules/products/routes/productRoutes"));
+const bundleRoute_1 = __importDefault(require("../modules/bundles/routes/bundleRoute"));
+const cartRoute_1 = __importDefault(require("../modules/cart/routes/cartRoute"));
+const wishlistRoutes_1 = __importDefault(require("../modules/wishlist/routes/wishlistRoutes"));
+const homepageRoute_1 = __importDefault(require("../modules/homepage/routes/homepageRoute"));
+const orderRoutes_1 = __importDefault(require("../modules/orders/routes/orderRoutes"));
+const paymentRoute_1 = __importDefault(require("../modules/payment/routes/paymentRoute"));
+router.use('/categoryRoute', categoryRoutes_1.default);
+router.use('/productRoute', productRoutes_1.default);
+router.use('/bundleRoute', bundleRoute_1.default);
+router.use('/cartRoute', cartRoute_1.default);
+router.use('/wishlistRoute', wishlistRoutes_1.default);
+router.use('/homepageRoute', homepageRoute_1.default);
+router.use('/orderRoute', orderRoutes_1.default);
+router.use('/paymentRoute', paymentRoute_1.default);
+exports.default = router;
