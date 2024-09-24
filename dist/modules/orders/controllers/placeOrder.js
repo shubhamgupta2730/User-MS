@@ -230,7 +230,7 @@ const placeOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 yield transporter.sendMail(mailOptions);
             }
             // Schedule status update to "delivered" after 5 minutes
-            yield axios_1.default.post(`http://localhost:3005/schedule-delivery`, {
+            yield axios_1.default.post(`https://scheduler-ms.onrender.com/schedule-delivery`, {
                 orderId: order._id,
             });
         }

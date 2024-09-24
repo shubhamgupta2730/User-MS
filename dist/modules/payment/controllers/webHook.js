@@ -95,7 +95,7 @@ const webhookHandler = (req, res) => __awaiter(void 0, void 0, void 0, function*
             // Call the scheduler microservice to update the order status to delivered after 5 minutes
             try {
                 // Schedule status update to "delivered" after 5 minutes
-                yield axios_1.default.post(`http://localhost:3005/schedule-delivery`, {
+                yield axios_1.default.post(`https://scheduler-ms.onrender.com/schedule-delivery`, {
                     orderId: orderId,
                 });
                 console.log(`Scheduler service notified for Order ID: ${order._id}`);
