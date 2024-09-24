@@ -271,7 +271,7 @@ const placeOrder = async (req: CustomRequest, res: Response) => {
       }
 
       // Schedule status update to "delivered" after 5 minutes
-      await axios.post(`http://localhost:3005/schedule-delivery`, {
+      await axios.post(`https://scheduler-ms.onrender.com/schedule-delivery`, {
         orderId: order._id,
       });
     }
